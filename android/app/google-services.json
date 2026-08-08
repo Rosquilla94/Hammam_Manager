@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "720084868040",
+    "project_id": "hammam-equipo-triana",
+    "storage_bucket": "hammam-equipo-triana.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:720084868040:android:ddc58fde165ecd4782befd",
+        "android_client_info": {
+          "package_name": "com.example.hammam_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVTpgLakaNxCKsEycJESDTfkG5-Dq5FHk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
