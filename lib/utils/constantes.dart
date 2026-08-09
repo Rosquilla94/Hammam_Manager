@@ -8,7 +8,7 @@ class AppColors {
 }
 
 class AppConfig {
-  static const String pinJefa = "1234";
+  static const String pinJefa = "0809";
   
   static const List<String> rolesOrdenados = [
     'Montaje', 'Apoyo', 'A', 'AZ', 'AA', 'AE', 'ASE', 

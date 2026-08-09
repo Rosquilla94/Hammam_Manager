@@ -5,7 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-// --- PANTALLA DE ESTADÍSTICAS AVANZADA (Ordenada por total de turnos) ---
+// --- PANTALLA DE ESTADÍSTICAS AVANZADA (Con Filtros) ---
 class PantallaEstadisticas extends StatefulWidget {
   const PantallaEstadisticas({super.key});
   @override
@@ -14,6 +14,9 @@ class PantallaEstadisticas extends StatefulWidget {
 
 class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
   DateTime mesVisualizado = DateTime.now();
+  
+  // --- NUEVA VARIABLE: MEMORIA DEL FILTRO ---
+  String filtroActual = 'Roles'; 
 
   void _cambiarMes(int mesesSuma) {
     setState(() {
@@ -21,13 +24,47 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
     });
   }
 
+  // --- LÓGICA DEL FILTRO ACTUALIZADA ---
+  bool _cumpleFiltro(String rol) {
+    if (filtroActual == 'Montaje') {
+      return rol == 'Montaje';
+    } else if (filtroActual == 'Roles') {
+      // Ahora incluye A, AZ, AE y ASE
+      return ['A', 'AZ', 'AE', 'ASE'].contains(rol); 
+    } else if (filtroActual == 'AA/Despedida') {
+      // Nueva pestaña para AA y Despedida
+      return ['AA', 'Despedida'].contains(rol);
+    } else if (filtroActual == 'Servicios Especiales') {
+      return ['ZAH', 'BAY 30', 'BAY 45', 'JZ', 'NAF'].contains(rol);
+    }
+    return false;
+  }
+
+  // --- DISEÑO DE LOS BOTONES DE FILTRO ---
+  Widget _chipFiltro(String titulo) {
+    bool activo = filtroActual == titulo;
+    return ChoiceChip(
+      label: Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, color: activo ? Colors.white : Colors.black87)),
+      selected: activo,
+      selectedColor: const Color(0xFF004D40), // Verde oscuro si está activo
+      backgroundColor: Colors.grey[200], // Gris claro si está inactivo
+      showCheckmark: false, // Quitamos el 'tic' para que parezca un botón normal
+      onSelected: (bool seleccionado) {
+        if (seleccionado) {
+          setState(() {
+            filtroActual = titulo;
+          });
+        }
+      },
+    );
+  }
+
   Future<void> _generarYCompartirPDF(String mesTxt, Map<String, Map<String, int>> stats) async {
     if (stats.isEmpty) {
-      Share.share("No hay datos de roles registrados en $mesTxt.");
+      Share.share("No hay datos de $filtroActual registrados en $mesTxt.");
       return;
     }
     
-    // Para el PDF también los ordenamos
     var listaOrdenadaPDF = stats.entries.toList();
     listaOrdenadaPDF.sort((a, b) {
       int totalA = a.value.values.fold(0, (suma, cant) => suma + cant);
@@ -47,8 +84,9 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text("RESUMEN DE EQUIPO", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800)),
-                  pw.Text(mesTxt, style: pw.TextStyle(fontSize: 18, color: PdfColors.grey700)),
+                  // Añadimos el nombre del filtro al PDF
+                  pw.Text("RESUMEN: ${filtroActual.toUpperCase()}", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800)),
+                  pw.Text(mesTxt, style: pw.TextStyle(fontSize: 16, color: PdfColors.grey700)),
                 ]
               )
             ),
@@ -73,7 +111,7 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
                         child: pw.Row(
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           children: [
-                            pw.Text("Rol de ${entradaRol.key}", style: const pw.TextStyle(fontSize: 12)),
+                            pw.Text(entradaRol.key, style: const pw.TextStyle(fontSize: 12)),
                             pw.Text("${entradaRol.value} turnos", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
                           ]
                         )
@@ -90,7 +128,7 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
       )
     );
 
-    await Printing.sharePdf(bytes: await pdf.save(), filename: 'Resumen_Hammam_$mesTxt.pdf');
+    await Printing.sharePdf(bytes: await pdf.save(), filename: 'Resumen_${filtroActual}_$mesTxt.pdf');
   }
 
   @override
@@ -113,37 +151,35 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
               horas.forEach((hora, roles) {
                 (roles as Map<String, dynamic>).forEach((rol, asignado) {
                   
-                if (rol == 'A' || rol == 'AZ') {
-                  void sumarRol(String persona) {
-                    if (!statsPorPersona.containsKey(persona)) statsPorPersona[persona] = {};
-                    statsPorPersona[persona]![rol] = (statsPorPersona[persona]![rol] ?? 0) + 1;
-                    if (statsPorPersona[persona]![rol]! > maximosTurnosDeUnaPersona) {
-                      maximosTurnosDeUnaPersona = statsPorPersona[persona]![rol]!;
+                  // --- AQUÍ APLICAMOS EL FILTRO DINÁMICO ---
+                  if (_cumpleFiltro(rol)) {
+                    void sumarRol(String persona) {
+                      if (!statsPorPersona.containsKey(persona)) statsPorPersona[persona] = {};
+                      statsPorPersona[persona]![rol] = (statsPorPersona[persona]![rol] ?? 0) + 1;
+                      if (statsPorPersona[persona]![rol]! > maximosTurnosDeUnaPersona) {
+                        maximosTurnosDeUnaPersona = statsPorPersona[persona]![rol]!;
+                      }
+                    }
+
+                    if (asignado is List) {
+                      for (var p in asignado) sumarRol(p.toString());
+                    } else if (asignado is String && asignado.isNotEmpty) {
+                      sumarRol(asignado);
                     }
                   }
-
-                  if (asignado is List) {
-                    for (var p in asignado) sumarRol(p.toString());
-                  } else if (asignado is String && asignado.isNotEmpty) {
-                    sumarRol(asignado);
-                  }
-                  }
+                  
                 });
               });
             }
           }
         }
 
-        // --- LA MAGIA DEL ORDEN DE MAYOR A MENOR ---
         var listaOrdenada = statsPorPersona.entries.toList();
         listaOrdenada.sort((a, b) {
-          // Sumamos todas las horas de 'a' y de 'b'
           int totalA = a.value.values.fold(0, (suma, cantidad) => suma + cantidad);
           int totalB = b.value.values.fold(0, (suma, cantidad) => suma + cantidad);
-          // Los ordenamos descendente (el mayor arriba)
           return totalB.compareTo(totalA);
         });
-        // ------------------------------------------
 
         return Scaffold(
           appBar: AppBar(
@@ -161,7 +197,7 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
             children: [
               Container(
                 color: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                padding: const EdgeInsets.only(top: 10, left: 20, right: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -172,18 +208,39 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
                 ),
               ),
               
+              // --- NUEVA BARRA DE BOTONES DESLIZABLE ---
+              Container(
+                color: Colors.white,
+                width: double.infinity,
+                padding: const EdgeInsets.only(bottom: 10),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      _chipFiltro('Roles'), // Predeterminado
+                      const SizedBox(width: 8),
+                      _chipFiltro('AA/Despedida'), // <-- NUEVO BOTÓN AQUÍ
+                      const SizedBox(width: 8),
+                      _chipFiltro('Montaje'),
+                      const SizedBox(width: 8),
+                      _chipFiltro('Servicios Especiales'),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              
               Expanded(
                 child: snapshot.connectionState == ConnectionState.waiting 
                   ? const Center(child: CircularProgressIndicator(color: Color(0xFF004D40)))
                   : listaOrdenada.isEmpty
-                    ? const Center(child: Text("No hay roles registrados en este mes.", style: TextStyle(fontSize: 16, color: Colors.grey)))
+                    ? Center(child: Text("No hay datos de $filtroActual en este mes.", style: const TextStyle(fontSize: 16, color: Colors.grey)))
                     : ListView(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80), // Mantenemos el aire por abajo
                         children: listaOrdenada.map((entradaPersona) {
                           String nombre = entradaPersona.key;
                           Map<String, int> rolesDeEstaPersona = entradaPersona.value;
-
-                          // Calculamos el total de esa persona para ponerlo al lado del nombre
                           int totalTurnos = rolesDeEstaPersona.values.fold(0, (suma, cantidad) => suma + cantidad);
 
                           return Card(
@@ -198,7 +255,6 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
                                       const Icon(Icons.person, color: Color(0xFF004D40)),
                                       const SizedBox(width: 8),
                                       Expanded(child: Text(nombre, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
-                                      // Añadimos el Total global en la tarjeta
                                       Text("$totalTurnos turnos", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey)),
                                     ],
                                   ),

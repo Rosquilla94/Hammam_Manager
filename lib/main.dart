@@ -6,6 +6,7 @@ import 'screens/pantalla_equipo.dart';
 import 'screens/pantalla_bolsa_horas.dart';
 import 'screens/pantalla_estadisticas.dart';
 import 'screens/pantalla_asignacion.dart';
+import 'screens/pantalla_carga.dart';
 
 // --- IMPORTACIONES DE FIREBASE ---
 import 'package:firebase_core/firebase_core.dart';
@@ -56,7 +57,7 @@ class HammamApp extends StatelessWidget {
         ),
       ), // <-- Aquí cerramos correctamente el ThemeData con una sola coma
       
-      home: const PantallaTurnos(), // <-- El home va fuera, al nivel del theme
+      home: const PantallaCarga(), // <-- El home va fuera, al nivel del theme
     );
   }
 }
@@ -172,6 +173,34 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
     );
   }
 
+  // --- FUNCIÓN PARA CREAR EL TEXTO GRIS DEL RESUMEN ---
+  String _generarResumenHora(Map<String, dynamic> diaData, String hora) {
+    Map<String, dynamic> datosHora = diaData[hora] ?? {};
+    if (datosHora.isEmpty) return "";
+
+    List<String> resumen = [];
+    List<String> rolesOrdenados = ['Montaje', 'Apoyo', 'A', 'AZ', 'AA', 'AE', 'ASE', 'Despedida', 'ZAH', 'BAY 30', 'BAY 45', 'JZ', 'NAF'];
+
+    for (String rol in rolesOrdenados) {
+      if (datosHora.containsKey(rol)) {
+        var valor = datosHora[rol];
+        String textoValor = "";
+        
+        // Comprobamos si es una lista (varias personas) o un texto solo
+        if (valor is List && valor.isNotEmpty) {
+          textoValor = valor.join(', ');
+        } else if (valor is String && valor.isNotEmpty) {
+          textoValor = valor;
+        }
+        
+        if (textoValor.isNotEmpty) {
+          resumen.add("$rol: $textoValor");
+        }
+      }
+    }
+    return resumen.join('   |   '); // Un separador elegante
+  }
+
   @override
   Widget build(BuildContext context) {
     // --- LÓGICA DE HORAS MOSTRADAS ---
@@ -259,34 +288,83 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
             const Divider(height: 1),
             // ------------------------------------------
           Expanded(
-            child: ListView.builder(
-              itemCount: horasMostrar.length,
-              itemBuilder: (context, index) {
-                String hora = horasMostrar[index];
-                String subtitulo = 'Roles y Masajes'; // El valor por defecto
-
-                if (hora == '09h') {
-                  subtitulo = 'Montaje';
-                } else if (['11h', '13h', '15h', '17h', '19h', '21h', '23h'].contains(hora)) {
-                  subtitulo = 'Apoyo';
+            // --- ¡AQUÍ ESTÁ EL NUEVO STREAMBUILDER! ---
+            // Se conecta a Firebase para escuchar los cambios de este día exacto
+            child: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('turnos')
+                  .doc(fechaTexto.replaceAll('/', '-'))
+                  .snapshots(),
+              builder: (context, snapshot) {
+                
+                // Mientras carga, mostramos el circulito
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFF004D40)));
                 }
 
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: ListTile(
-                    leading: const Icon(Icons.access_time, color: Color(0xFF004D40)), 
-                    title: Text(hora, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    subtitle: Text(subtitulo),
-                    trailing: const Icon(Icons.edit, color: Color(0xFFD4AF37)), 
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => PantallaAsignacion(hora: hora, fecha: fechaTexto)),
-                      );
-                    },
-                  ),
+                // ¡AQUÍ CREAMOS LA VARIABLE diaData PARA QUE LA LEA EL RECUADRO GRIS!
+                Map<String, dynamic> diaData = (snapshot.data?.data() as Map<String, dynamic>?) ?? {};
+
+                return ListView.builder(
+                  itemCount: horasMostrar.length,
+                  itemBuilder: (context, index) {
+                    String hora = horasMostrar[index];
+                    String subtitulo = 'Roles y Masajes';
+
+                    if (hora == '09h') {
+                      subtitulo = 'Montaje';
+                    } else if (['11h', '13h', '15h', '17h', '19h', '21h', '23h'].contains(hora)) {
+                      subtitulo = 'Apoyo';
+                    }
+
+                    // Ahora sí, esta función ya sabe quién es diaData
+                    String resumen = _generarResumenHora(diaData, hora);
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 2,
+                      clipBehavior: Clip.antiAlias, 
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            // ¡Corregido fechaTxt por fechaTexto!
+                            MaterialPageRoute(builder: (context) => PantallaAsignacion(hora: hora, fecha: fechaTexto)), 
+                          );
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ListTile(
+                              title: Text(hora, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                              subtitle: Text(subtitulo, style: const TextStyle(fontWeight: FontWeight.w500)),
+                              trailing: const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
+                            ),
+                            
+                            if (resumen.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  border: const Border(top: BorderSide(color: Colors.black12, width: 1)),
+                                ),
+                                child: Text(
+                                  resumen,
+                                  style: const TextStyle(
+                                    color: Colors.black54, 
+                                    fontSize: 14, 
+                                    fontStyle: FontStyle.italic,
+                                    height: 1.4, 
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 );
-              },
+              }
             ),
           ),
           // --- BOTÓN DE COMPARTIR CORREGIDO CON SAFEAREA Y NUEVO TEXTO ---
@@ -340,10 +418,14 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
       return valor.toString();
     }
 
-    // Añadimos 'ASE' a la lista de orden
     List<String> rolesOrdenados = ['Montaje', 'Apoyo', 'A', 'AZ', 'AA', 'AE', 'ASE', 'Despedida', 'ZAH', 'BAY 30', 'BAY 45', 'JZ', 'NAF'];
     
-    List<String> todasLasHoras = [...horasManana, ...horasTarde];
+    // --- LA MAGIA ESTÁ AQUÍ ---
+    // Le damos la lista completa de horas de la jornada.
+    List<String> todasLasHoras = [
+      '09h', '10h', '11h', '12h', '13h', '14h', '15h', 
+      '16h', '17h', '18h', '19h', '20h', '21h', '22h', '23h'
+    ];
 
     for (String hora in todasLasHoras) {
       var datos = datosDeLaFecha[hora] ?? {};
@@ -352,7 +434,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
       for (String r in rolesOrdenados) {
         String val = formatear(datos[r]);
         if (val.isNotEmpty) {
-          // Añadimos 'ASE' para que se formatee sin los dos puntos (como el resto de la planta)
+          // Añadimos 'ASE' para que se formatee sin los dos puntos
           if (['A', 'AZ', 'AA', 'AE', 'ASE', 'Despedida'].contains(r)) {
             lineas.add("$r $val");
           } else {
@@ -378,4 +460,3 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
     }
   }
 }
-
