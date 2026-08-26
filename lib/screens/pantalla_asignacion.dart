@@ -44,11 +44,18 @@ class PantallaAsignacion extends StatelessWidget {
         const SizedBox(height: 10),
         _selectorMultiple(context, 'Montaje', diaData, equipoGlobal, docId, hora), 
       ];
-    } else if (hora == '11h' || hora == '13h' || hora == '15h' || hora == '17h' || hora == '19h' || hora == '21h' || hora == '23h') {
+    } else if (['11h', '13h', '15h', '17h', '19h', '21h', '23h'].contains(hora)) {
       return [
         const Text('Apoyo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         _selectorMultiple(context, 'Apoyo', diaData, equipoGlobal, docId, hora),
+      ];
+    } else if (hora.contains(':30')) { 
+      // --- NUEVA SECCIÓN: COMIDAS/DESCANSOS ---
+      return [
+        const Text('Personal en Descanso', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        _selectorMultiple(context, 'Descanso', diaData, equipoGlobal, docId, hora),
       ];
     } else {
       return [

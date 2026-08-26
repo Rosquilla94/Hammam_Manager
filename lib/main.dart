@@ -77,6 +77,9 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
 
   // --- NUEVA VARIABLE: ESTADO DEL INTERRUPTOR ---
   bool mostrarHorasImpares = false;
+
+  // --- NUEVA VARIABLE: ESTADO DEL INTERRUPTOR DE COMIDAS ---
+  bool mostrarComidas = false;
   
   // ¡Añadidas las 15h aquí!
   final List<String> horasManana = ['09h', '10h', '11h', '12h', '14h', '15h', '16h'];
@@ -179,7 +182,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
     if (datosHora.isEmpty) return "";
 
     List<String> resumen = [];
-    List<String> rolesOrdenados = ['Montaje', 'Apoyo', 'A', 'AZ', 'AA', 'AE', 'ASE', 'Despedida', 'ZAH', 'BAY 30', 'BAY 45', 'JZ', 'NAF'];
+    List<String> rolesOrdenados = ['Descanso', 'Montaje', 'Apoyo', 'A', 'AZ', 'AA', 'AE', 'ASE', 'Despedida', 'ZAH', 'BAY 30', 'BAY 45', 'JZ', 'NAF'];
 
     for (String rol in rolesOrdenados) {
       if (datosHora.containsKey(rol)) {
@@ -203,18 +206,34 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
 
   @override
   Widget build(BuildContext context) {
-    // --- LÓGICA DE HORAS MOSTRADAS ---
+
+    // --- LÓGICA DE HORAS MOSTRADAS ACTUALIZADA ---
     List<String> horasMostrar = [];
 
     if (turnoSeleccionado == 'Mañana') {
-      horasMostrar = mostrarHorasImpares
-          ? ['09h', '10h', '11h', '12h', '13h', '14h', '15h', '16h'] // Mañana completa
-          : ['09h', '10h', '11h', '12h', '14h', '16h']; // Mañana sin las impares extra
+      horasMostrar.addAll(['09h', '10h']);
+      if (mostrarHorasImpares) horasMostrar.add('11h');
+      if (mostrarComidas) horasMostrar.add('11:30');
+      horasMostrar.add('12h');
+      if (mostrarHorasImpares) horasMostrar.add('13h');
+      if (mostrarComidas) horasMostrar.add('13:30');
+      horasMostrar.add('14h');
+      if (mostrarHorasImpares) horasMostrar.add('15h');
+      if (mostrarComidas) horasMostrar.add('15:30');
+      horasMostrar.add('16h');
     } else {
-      // Si el turnoSeleccionado es 'Tarde'
-      horasMostrar = mostrarHorasImpares
-          ? ['17h', '18h', '19h', '20h', '21h', '22h', '23h', '24h'] // Tarde completa
-          : ['18h', '20h', '22h', '24h']; // Tarde sin las impares
+      // Turno de Tarde
+      if (mostrarHorasImpares) horasMostrar.add('17h');
+      horasMostrar.add('18h');
+      if (mostrarHorasImpares) horasMostrar.add('19h');
+      if (mostrarComidas) horasMostrar.add('19:30');
+      horasMostrar.add('20h');
+      if (mostrarHorasImpares) horasMostrar.add('21h');
+      if (mostrarComidas) horasMostrar.add('21:30');
+      horasMostrar.add('22h');
+      if (mostrarHorasImpares) horasMostrar.add('23h');
+      if (mostrarComidas) horasMostrar.add('23:30');
+      horasMostrar.add('24h');
     }
     
     return Scaffold(
@@ -268,25 +287,33 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
             _botonTurno('Tarde', '🌙'), 
           ]),
         
-        // --- NUEVO INTERRUPTOR DE HORAS IMPARES ---
-            Container(
-              color: Colors.white,
-              child: SwitchListTile(
-                title: const Text(
-                  'Habilitar/Deshabilitar horas impares', 
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D40))
+        // --- PANEL DE INTERRUPTORES ---
+          Container(
+            color: Colors.white,
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('Mostrar horas impares', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                  value: mostrarHorasImpares,
+                  activeColor: const Color(0xFFD4AF37), 
+                  onChanged: (bool valor) {
+                    setState(() => mostrarHorasImpares = valor);
+                  },
                 ),
-                value: mostrarHorasImpares,
-                activeColor: const Color(0xFFD4AF37), // Dorado cuando está encendido
-                onChanged: (bool valor) {
-                  setState(() {
-                    mostrarHorasImpares = valor;
-                  });
-                },
-              ),
+                const Divider(height: 1, indent: 16, endIndent: 16), // Rayita separadora
+                SwitchListTile(
+                  title: const Text('Mostrar Comida/Descanso', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                  value: mostrarComidas,
+                  activeColor: const Color(0xFFD4AF37), // Dorado también
+                  onChanged: (bool valor) {
+                    setState(() => mostrarComidas = valor);
+                  },
+                ),
+              ],
             ),
-            const Divider(height: 1),
-            // ------------------------------------------
+          ),
+          const Divider(height: 1),
+          // ------------------------------------------
           Expanded(
             // --- ¡AQUÍ ESTÁ EL NUEVO STREAMBUILDER! ---
             // Se conecta a Firebase para escuchar los cambios de este día exacto
@@ -305,64 +332,76 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
                 // ¡AQUÍ CREAMOS LA VARIABLE diaData PARA QUE LA LEA EL RECUADRO GRIS!
                 Map<String, dynamic> diaData = (snapshot.data?.data() as Map<String, dynamic>?) ?? {};
 
-                return ListView.builder(
-                  itemCount: horasMostrar.length,
-                  itemBuilder: (context, index) {
-                    String hora = horasMostrar[index];
-                    String subtitulo = 'Roles y Masajes';
+                String docId = fechaTexto.replaceAll('/', '-');
 
-                    if (hora == '09h') {
-                      subtitulo = 'Montaje';
-                    } else if (['11h', '13h', '15h', '17h', '19h', '21h', '23h'].contains(hora)) {
-                      subtitulo = 'Apoyo';
-                    }
+                // Cambiamos a un ListView normal para meter cosas antes y después
+                return ListView(
+                  children: [
+                    // --- 1. COMENTARIO SUPERIOR ---
+                    CajaComentario(
+                      docId: docId, 
+                      campo: 'comentarioSuperior', 
+                      textoInicial: diaData['comentarioSuperior'] ?? ''
+                    ),
 
-                    // Ahora sí, esta función ya sabe quién es diaData
-                    String resumen = _generarResumenHora(diaData, hora);
+                    // --- 2. LISTA DE HORAS ---
+                    ...horasMostrar.map((hora) {
+                      String subtitulo = 'Roles y Masajes';
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      elevation: 2,
-                      clipBehavior: Clip.antiAlias, 
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            // ¡Corregido fechaTxt por fechaTexto!
-                            MaterialPageRoute(builder: (context) => PantallaAsignacion(hora: hora, fecha: fechaTexto)), 
-                          );
-                        },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            ListTile(
-                              title: Text(hora, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
-                              subtitle: Text(subtitulo, style: const TextStyle(fontWeight: FontWeight.w500)),
-                              trailing: const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
-                            ),
-                            
-                            if (resumen.isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  border: const Border(top: BorderSide(color: Colors.black12, width: 1)),
-                                ),
-                                child: Text(
-                                  resumen,
-                                  style: const TextStyle(
-                                    color: Colors.black54, 
-                                    fontSize: 14, 
-                                    fontStyle: FontStyle.italic,
-                                    height: 1.4, 
+                      if (hora == '09h') {
+                        subtitulo = 'Montaje';
+                      } else if (['11h', '13h', '15h', '17h', '19h', '21h', '23h'].contains(hora)) {
+                        subtitulo = 'Apoyo';
+                      } else if (hora.contains(':30')) {
+                        subtitulo = 'Comida/Descanso';
+                      }
+
+                      String resumen = _generarResumenHora(diaData, hora);
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        elevation: 2,
+                        clipBehavior: Clip.antiAlias, 
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => PantallaAsignacion(hora: hora, fecha: fechaTexto)), 
+                            );
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ListTile(
+                                title: Text(hora, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                                subtitle: Text(subtitulo, style: const TextStyle(fontWeight: FontWeight.w500)),
+                                trailing: const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
+                              ),
+                              if (resumen.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    border: const Border(top: BorderSide(color: Colors.black12, width: 1)),
+                                  ),
+                                  child: Text(
+                                    resumen,
+                                    style: const TextStyle(color: Colors.black54, fontSize: 14, fontStyle: FontStyle.italic, height: 1.4),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    }).toList(),
+
+                    // --- 3. COMENTARIO INFERIOR ---
+                    CajaComentario(
+                      docId: docId, 
+                      campo: 'comentarioInferior', 
+                      textoInicial: diaData['comentarioInferior'] ?? ''
+                    ),
+                  ],
                 );
               }
             ),
@@ -402,29 +441,36 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
     );
   }
 
-  // --- LÓGICA DE COMPARTIR EL DÍA COMPLETO ---
+ // --- LÓGICA DE COMPARTIR EL DÍA COMPLETO ---
   Future<void> _compartirDiaCompleto(String fechaTxt) async {
     String docId = fechaTxt.replaceAll('/', '-'); 
     DocumentSnapshot doc = await FirebaseFirestore.instance.collection('turnos').doc(docId).get();
     Map<String, dynamic> datosDeLaFecha = (doc.data() as Map<String, dynamic>?) ?? {};
 
+    // Sacamos los comentarios de la base de datos
+    String comentarioSup = datosDeLaFecha['comentarioSuperior'] ?? '';
+    String comentarioInf = datosDeLaFecha['comentarioInferior'] ?? '';
+
     String mensaje = "Organización $fechaTxt\n\n";
     bool hayDatos = false;
 
-    // Función auxiliar para leer tanto Strings solos como Listas múltiples
+    // Si hay un comentario arriba, lo ponemos el primero
+    if (comentarioSup.isNotEmpty) {
+      hayDatos = true;
+      mensaje += " $comentarioSup\n\n";
+    }
+
     String formatear(dynamic valor) {
       if (valor == null) return '';
-      if (valor is List) return valor.join(' y '); // Une varios nombres con "y"
+      if (valor is List) return valor.join(' y ');
       return valor.toString();
     }
 
-    List<String> rolesOrdenados = ['Montaje', 'Apoyo', 'A', 'AZ', 'AA', 'AE', 'ASE', 'Despedida', 'ZAH', 'BAY 30', 'BAY 45', 'JZ', 'NAF'];
+    List<String> rolesOrdenados = ['Descanso', 'Montaje', 'Apoyo', 'A', 'AZ', 'AA', 'AE', 'ASE', 'Despedida', 'ZAH', 'BAY 30', 'BAY 45', 'JZ', 'NAF'];
     
-    // --- LA MAGIA ESTÁ AQUÍ ---
-    // Le damos la lista completa de horas de la jornada.
     List<String> todasLasHoras = [
-      '09h', '10h', '11h', '12h', '13h', '14h', '15h', 
-      '16h', '17h', '18h', '19h', '20h', '21h', '22h', '23h'
+      '09h', '10h', '11h', '11:30', '12h', '13h', '13:30', '14h', '15h', '15:30', 
+      '16h', '17h', '18h', '19h', '19:30', '20h', '21h', '21:30', '22h', '23h', '23:30', '24h'
     ];
 
     for (String hora in todasLasHoras) {
@@ -434,7 +480,6 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
       for (String r in rolesOrdenados) {
         String val = formatear(datos[r]);
         if (val.isNotEmpty) {
-          // Añadimos 'ASE' para que se formatee sin los dos puntos
           if (['A', 'AZ', 'AA', 'AE', 'ASE', 'Despedida'].contains(r)) {
             lineas.add("$r $val");
           } else {
@@ -452,11 +497,94 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
         mensaje += "\n";
       }
     }
+
+    // Si hay un comentario abajo, lo pegamos al final
+    if (comentarioInf.isNotEmpty) {
+      hayDatos = true;
+      mensaje += " $comentarioInf\n";
+    }
     
     if (hayDatos) {
       Share.share(mensaje.trim());
     } else {
       Share.share("No hay turnos asignados para el $fechaTxt.");
     }
+  }
+}
+
+// --- NUEVO WIDGET PARA LOS COMENTARIOS EN LÍNEA ---
+class CajaComentario extends StatefulWidget {
+  final String docId;
+  final String campo;
+  final String textoInicial;
+
+  const CajaComentario({super.key, required this.docId, required this.campo, required this.textoInicial});
+
+  @override
+  State<CajaComentario> createState() => _CajaComentarioState();
+}
+
+class _CajaComentarioState extends State<CajaComentario> {
+  late TextEditingController _controlador;
+  bool _modoEdicion = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controlador = TextEditingController(text: widget.textoInicial);
+    if (widget.textoInicial.isNotEmpty) _modoEdicion = true;
+  }
+
+  @override
+  void didUpdateWidget(CajaComentario oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Si Triana cambia de día en el calendario, reseteamos el cuadro
+    if (oldWidget.docId != widget.docId) {
+      _controlador.text = widget.textoInicial;
+      _modoEdicion = widget.textoInicial.isNotEmpty;
+    }
+  }
+
+  void _guardarTexto() {
+    FirebaseFirestore.instance.collection('turnos').doc(widget.docId).set({
+      widget.campo: _controlador.text
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_modoEdicion) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: TextButton.icon(
+          onPressed: () => setState(() => _modoEdicion = true),
+          icon: const Icon(Icons.add, color: Color(0xFF004D40)),
+          label: const Text('Añadir comentario', style: TextStyle(color: Color(0xFF004D40), fontWeight: FontWeight.bold, fontSize: 16)),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: TextField(
+        controller: _controlador,
+        maxLines: null, // Crece hacia abajo si escribe un testamento
+        decoration: InputDecoration(
+          hintText: 'Escribe un comentario...',
+          filled: true,
+          fillColor: Colors.white,
+          border: const OutlineInputBorder(),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.check_circle, color: Color(0xFF004D40)),
+            tooltip: 'Guardar y cerrar teclado',
+            onPressed: () {
+              _guardarTexto();
+              FocusScope.of(context).unfocus(); // Cierra el teclado del móvil
+            },
+          ),
+        ),
+        onChanged: (val) => _guardarTexto(), // Autoguardado mágico con cada letra
+      ),
+    );
   }
 }
