@@ -148,27 +148,31 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
             List<String> partes = doc.id.split('-');
             if (partes.length == 3 && int.parse(partes[1]) == mesVisualizado.month && int.parse(partes[2]) == mesVisualizado.year) {
               Map<String, dynamic> horas = doc.data() as Map<String, dynamic>;
+              
               horas.forEach((hora, roles) {
-                (roles as Map<String, dynamic>).forEach((rol, asignado) {
-                  
-                  // --- AQUÍ APLICAMOS EL FILTRO DINÁMICO ---
-                  if (_cumpleFiltro(rol)) {
-                    void sumarRol(String persona) {
-                      if (!statsPorPersona.containsKey(persona)) statsPorPersona[persona] = {};
-                      statsPorPersona[persona]![rol] = (statsPorPersona[persona]![rol] ?? 0) + 1;
-                      if (statsPorPersona[persona]![rol]! > maximosTurnosDeUnaPersona) {
-                        maximosTurnosDeUnaPersona = statsPorPersona[persona]![rol]!;
+                // --- EL PARACAÍDAS: Solo procesa si 'roles' es una lista de turnos (ignorando los comentarios de texto) ---
+                if (roles is Map<String, dynamic>) {
+                  roles.forEach((rol, asignado) {
+                    
+                    // --- AQUÍ APLICAMOS EL FILTRO DINÁMICO ---
+                    if (_cumpleFiltro(rol)) {
+                      void sumarRol(String persona) {
+                        if (!statsPorPersona.containsKey(persona)) statsPorPersona[persona] = {};
+                        statsPorPersona[persona]![rol] = (statsPorPersona[persona]![rol] ?? 0) + 1;
+                        if (statsPorPersona[persona]![rol]! > maximosTurnosDeUnaPersona) {
+                          maximosTurnosDeUnaPersona = statsPorPersona[persona]![rol]!;
+                        }
+                      }
+
+                      if (asignado is List) {
+                        for (var p in asignado) sumarRol(p.toString());
+                      } else if (asignado is String && asignado.isNotEmpty) {
+                        sumarRol(asignado);
                       }
                     }
-
-                    if (asignado is List) {
-                      for (var p in asignado) sumarRol(p.toString());
-                    } else if (asignado is String && asignado.isNotEmpty) {
-                      sumarRol(asignado);
-                    }
-                  }
-                  
-                });
+                    
+                  });
+                }
               });
             }
           }
