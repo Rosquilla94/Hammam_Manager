@@ -6,13 +6,13 @@ import 'screens/pantalla_equipo.dart';
 import 'screens/pantalla_bolsa_horas.dart';
 import 'screens/pantalla_estadisticas.dart';
 import 'screens/pantalla_asignacion.dart';
-import 'screens/pantalla_carga.dart';
+import 'team_selection.dart';
 
 // --- IMPORTACIONES DE FIREBASE ---
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 
 // --- ARRANQUE DE LA APP ---
 void main() async {
@@ -57,7 +57,7 @@ class HammamApp extends StatelessWidget {
         ),
       ), // <-- Aquí cerramos correctamente el ThemeData con una sola coma
       
-      home: const PantallaCarga(), // <-- El home va fuera, al nivel del theme
+      home: const TeamSelectionScreen(), // <-- El home va fuera, al nivel del theme
     );
   }
 }
@@ -72,8 +72,26 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
   String turnoSeleccionado = 'Mañana';
   DateTime fechaSeleccionada = DateTime.now(); 
 
-  // --- NUEVA VARIABLE: MEMORIA DEL CANDADO ---
-  bool sesionDesbloqueada = false;
+  // --- MAGIA: IDENTIFICADOR AUTOMÁTICO DE EQUIPO ---
+  String get nombreEquipo {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final user = email.split('@')[0]; 
+    
+    // Agrupamos a los usuarios bajo su carpeta de equipo correspondiente
+    if (user == 'triana' || user == 'carmen') return 'triana';
+    if (user == 'ruben' || user == 'monica') return 'ruben';
+    if (user == 'rocio' || user == 'santi') return 'rocio';
+    
+    return 'general';
+  }
+
+  // Esto creará carpetas separadas, pero respetará el historial de Triana
+  String get coleccionTurnos {
+    if (nombreEquipo == 'triana' || nombreEquipo == 'admin') {
+      return 'turnos'; // Triana (y los admin) leen la base de datos original
+    }
+    return 'turnos_$nombreEquipo'; // Los demás usan carpetas nuevas (turnos_ruben, etc.)
+  }
 
   // --- NUEVA VARIABLE: ESTADO DEL INTERRUPTOR ---
   bool mostrarHorasImpares = false;
@@ -101,79 +119,6 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
         fechaSeleccionada = seleccion;
       });
     }
-  }
-
-  // --- EL PORTERO INTELIGENTE ---
-  void _navegarProtegido(Widget pantallaDestino) {
-    if (sesionDesbloqueada) {
-      // Si ya metió el PIN antes, pasa directo sin preguntar
-      Navigator.push(context, MaterialPageRoute(builder: (context) => pantallaDestino));
-    } else {
-      // Si es la primera vez, le pide el PIN
-      _mostrarDialogoPin(context, pantallaDestino);
-    }
-  }
-
-  // --- FUNCIÓN DEL PIN ACTUALIZADA ---
-  Future<void> _mostrarDialogoPin(BuildContext context, Widget pantallaDestino) async {
-    TextEditingController controladorPin = TextEditingController();
-    String? mensajeError;
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialogo) {
-            return AlertDialog(
-              title: const Text('Acceso Restringido 🔒', style: TextStyle(fontWeight: FontWeight.bold)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Introduce el PIN de coordinación:'),
-                  const SizedBox(height: 15),
-                  TextField(
-                    controller: controladorPin,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    maxLength: 4,
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      labelText: 'PIN de 4 dígitos',
-                      errorText: mensajeError,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('CANCELAR', style: TextStyle(color: Colors.grey)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF004D40), foregroundColor: Colors.white),
-                  onPressed: () {
-                    if (controladorPin.text == AppConfig.pinJefa) {
-                      // AQUÍ ESTÁ LA MAGIA: Memorizamos que ya está desbloqueado
-                      setState(() {
-                        sesionDesbloqueada = true;
-                      });
-                      Navigator.pop(context); // Cierra el diálogo
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => pantallaDestino));
-                    } else {
-                      setStateDialogo(() {
-                        mensajeError = 'PIN incorrecto. Inténtalo de nuevo.';
-                        controladorPin.clear();
-                      });
-                    }
-                  },
-                  child: const Text('ENTRAR'),
-                ),
-              ],
-            );
-          }
-        );
-      }
-    );
   }
 
   // --- FUNCIÓN PARA CREAR EL TEXTO GRIS DEL RESUMEN ---
@@ -242,7 +187,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
           children: [
             // Image.asset('assets/logo.png', height: 30), 
             // const SizedBox(width: 10),
-            const Text('Hammam Triana', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('Hammam ${nombreEquipo.toUpperCase()}', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ), 
         centerTitle: false,
@@ -250,17 +195,17 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
           IconButton(
             icon: const Icon(Icons.schedule, color: Colors.white), 
             tooltip: 'Bolsa de Horas',
-            onPressed: () => _navegarProtegido(const PantallaBolsaHoras()), // Llama al portero
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PantallaBolsaHoras())),
           ),
           IconButton(
             icon: const Icon(Icons.bar_chart, color: Colors.white), 
             tooltip: 'Estadísticas',
-            onPressed: () => _navegarProtegido(const PantallaEstadisticas()), // Llama al portero
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PantallaEstadisticas())),
           ),
           IconButton(
             icon: const Icon(Icons.people, color: Colors.white), 
             tooltip: 'Gestionar Equipo',
-            onPressed: () => _navegarProtegido(PantallaEquipo()), // Llama al portero
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => PantallaEquipo())),
           )
         ],
       ),
@@ -319,7 +264,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
             // Se conecta a Firebase para escuchar los cambios de este día exacto
             child: StreamBuilder<DocumentSnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('turnos')
+                  .collection(coleccionTurnos) // Usamos la colección específica
                   .doc(fechaTexto.replaceAll('/', '-'))
                   .snapshots(),
               builder: (context, snapshot) {
@@ -339,6 +284,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
                   children: [
                     // --- 1. COMENTARIO SUPERIOR ---
                     CajaComentario(
+                      coleccion: coleccionTurnos, // ¡NUEVO!
                       docId: docId, 
                       campo: 'comentarioSuperior', 
                       textoInicial: diaData['comentarioSuperior'] ?? ''
@@ -397,9 +343,10 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
 
                     // --- 3. COMENTARIO INFERIOR ---
                     CajaComentario(
+                      coleccion: coleccionTurnos, // ¡NUEVO!
                       docId: docId, 
-                      campo: 'comentarioInferior', 
-                      textoInicial: diaData['comentarioInferior'] ?? ''
+                      campo: 'comentarioSuperior', 
+                      textoInicial: diaData['comentarioSuperior'] ?? ''
                     ),
                   ],
                 );
@@ -444,7 +391,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
  // --- LÓGICA DE COMPARTIR EL DÍA COMPLETO ---
   Future<void> _compartirDiaCompleto(String fechaTxt) async {
     String docId = fechaTxt.replaceAll('/', '-'); 
-    DocumentSnapshot doc = await FirebaseFirestore.instance.collection('turnos').doc(docId).get();
+    DocumentSnapshot doc = await FirebaseFirestore.instance.collection(coleccionTurnos).doc(docId).get();
     Map<String, dynamic> datosDeLaFecha = (doc.data() as Map<String, dynamic>?) ?? {};
 
     // Sacamos los comentarios de la base de datos
@@ -514,11 +461,12 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
 
 // --- NUEVO WIDGET PARA LOS COMENTARIOS EN LÍNEA ---
 class CajaComentario extends StatefulWidget {
+  final String coleccion; // ¡NUEVO!
   final String docId;
   final String campo;
   final String textoInicial;
 
-  const CajaComentario({super.key, required this.docId, required this.campo, required this.textoInicial});
+  const CajaComentario({super.key, required this.coleccion, required this.docId, required this.campo, required this.textoInicial});
 
   @override
   State<CajaComentario> createState() => _CajaComentarioState();
@@ -546,7 +494,7 @@ class _CajaComentarioState extends State<CajaComentario> {
   }
 
   void _guardarTexto() {
-    FirebaseFirestore.instance.collection('turnos').doc(widget.docId).set({
+    FirebaseFirestore.instance.collection(widget.coleccion).doc(widget.docId).set({
       widget.campo: _controlador.text
     }, SetOptions(merge: true));
   }

@@ -1,9 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // <-- Importamos Auth
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+
+// --- MAGIA: IDENTIFICADOR AUTOMÁTICO DE EQUIPO ---
+// --- MAGIA: IDENTIFICADOR AUTOMÁTICO DE EQUIPO ---
+  String get nombreEquipo {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final user = email.split('@')[0]; 
+    
+    // Agrupamos a los usuarios bajo su carpeta de equipo correspondiente
+    if (user == 'triana' || user == 'carmen') return 'triana';
+    if (user == 'ruben' || user == 'monica') return 'ruben';
+    if (user == 'rocio' || user == 'santi') return 'rocio';
+    
+    return 'general';
+  }
+
+// Variable dinámica para saber de dónde leer los turnos
+String get coleccionTurnos => (nombreEquipo == 'triana' || nombreEquipo == 'admin') ? 'turnos' : 'turnos_$nombreEquipo';
+
 
 // --- PANTALLA DE ESTADÍSTICAS AVANZADA (Con Filtros) ---
 class PantallaEstadisticas extends StatefulWidget {
@@ -137,7 +156,7 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
     String textoMes = "${nombresMeses[mesVisualizado.month]} ${mesVisualizado.year}";
 
     return FutureBuilder<QuerySnapshot>(
-      future: FirebaseFirestore.instance.collection('turnos').get(),
+      future: FirebaseFirestore.instance.collection(coleccionTurnos).get(), // <-- Usamos la colección dinámica
       builder: (context, snapshot) {
         
         Map<String, Map<String, int>> statsPorPersona = {};

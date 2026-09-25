@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hammam_manager/team_selection.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -57,7 +58,7 @@ class HammamApp extends StatelessWidget {
           elevation: 2,
         ),
       ),
-      home: const PantallaTurnos(),
+      home: const TeamSelectionScreen(),
     );
   }
 }
@@ -328,7 +329,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
   // --- LÓGICA DE COMPARTIR EL DÍA COMPLETO ---
   Future<void> _compartirDiaCompleto(String fechaTxt) async {
     String docId = fechaTxt.replaceAll('/', '-'); 
-    DocumentSnapshot doc = await FirebaseFirestore.instance.collection('turnos').doc(docId).get();
+    DocumentSnapshot doc = await FirebaseFirestore.instance.collection(coleccionTurnos).doc(docId).get();
     Map<String, dynamic> datosDeLaFecha = (doc.data() as Map<String, dynamic>?) ?? {};
 
     String mensaje = "Organización $fechaTxt\n\n";

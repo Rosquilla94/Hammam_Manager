@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // <-- Importamos Auth
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -7,6 +8,26 @@ import 'package:printing/printing.dart';
 // =========================================================
 // --- PANTALLAS PARA LA BOLSA DE HORAS ---
 // =========================================================
+
+// --- MAGIA: IDENTIFICADOR AUTOMÁTICO DE EQUIPO ---
+// --- MAGIA: IDENTIFICADOR AUTOMÁTICO DE EQUIPO ---
+  String get nombreEquipo {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final user = email.split('@')[0]; 
+    
+    // Agrupamos a los usuarios bajo su carpeta de equipo correspondiente
+    if (user == 'triana' || user == 'carmen') return 'triana';
+    if (user == 'ruben' || user == 'monica') return 'ruben';
+    if (user == 'rocio' || user == 'santi') return 'rocio';
+    
+    return 'general';
+  }
+
+// Variables dinámicas para las bases de datos de cada equipo
+String get documentoEquipo => (nombreEquipo == 'triana' || nombreEquipo == 'admin') ? 'equipo' : 'equipo_$nombreEquipo';
+String get documentoBolsa => (nombreEquipo == 'triana' || nombreEquipo == 'admin') ? 'bolsa_horas' : 'bolsa_horas_$nombreEquipo';
+String get coleccionRegistro => (nombreEquipo == 'triana' || nombreEquipo == 'admin') ? 'registro_horas' : 'registro_horas_$nombreEquipo';
+
 
 class PantallaBolsaHoras extends StatelessWidget {
   const PantallaBolsaHoras({super.key});
@@ -66,10 +87,10 @@ class PantallaBolsaHoras extends StatelessWidget {
         title: const Text('Bolsa de Horas', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('config').doc('equipo').snapshots(),
+        stream: FirebaseFirestore.instance.collection('config').doc(documentoEquipo).snapshots(), // <-- Usamos el documento dinámico
         builder: (context, snapshotEquipo) {
           return StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance.collection('config').doc('bolsa_horas').snapshots(),
+            stream: FirebaseFirestore.instance.collection('config').doc(documentoBolsa).snapshots(), // <-- Usamos el documento dinámico
             builder: (context, snapshotHoras) {
               if (!snapshotEquipo.hasData || !snapshotHoras.hasData) {
                 return const Center(child: CircularProgressIndicator(color: Color(0xFF004D40)));
@@ -260,14 +281,14 @@ class _PantallaEditarHorasState extends State<PantallaEditarHoras> {
 
                   if (cambios.isNotEmpty) {
                     String idRegistro = DateTime.now().millisecondsSinceEpoch.toString();
-                    await FirebaseFirestore.instance.collection('registro_horas').doc(idRegistro).set({
+                    await FirebaseFirestore.instance.collection(coleccionRegistro).doc(idRegistro).set({ // <-- Usamos la colección dinámica
                       'fecha_aplicada': fechaTxt,
                       'timestamp': idRegistro, 
                       'cambios': cambios,
                     });
                   }
 
-                  await FirebaseFirestore.instance.collection('config').doc('bolsa_horas').set(horasEditadas, SetOptions(merge: true));
+                  await FirebaseFirestore.instance.collection('config').doc(documentoBolsa).set(horasEditadas, SetOptions(merge: true)); // <-- Usamos el documento dinámico
                   
                   if (context.mounted) {
                     Navigator.pop(context); 
@@ -291,7 +312,7 @@ class PantallaHistorialHoras extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Historial de Cambios', style: TextStyle(fontWeight: FontWeight.bold))),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('registro_horas').orderBy('timestamp', descending: true).snapshots(),
+        stream: FirebaseFirestore.instance.collection(coleccionRegistro).orderBy('timestamp', descending: true).snapshots(), // <-- Usamos la colección dinámica
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: Color(0xFF004D40)));
