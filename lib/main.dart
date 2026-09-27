@@ -81,6 +81,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
     if (user == 'triana' || user == 'carmen') return 'triana';
     if (user == 'ruben' || user == 'monica') return 'ruben';
     if (user == 'rocio' || user == 'santi') return 'rocio';
+    if (user == 'admin' || user == 'admin2') return 'admin';
     
     return 'general';
   }
@@ -98,6 +99,70 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
 
   // --- NUEVA VARIABLE: ESTADO DEL INTERRUPTOR DE COMIDAS ---
   bool mostrarComidas = false;
+
+  // --- FUNCIÓN PARA CAMBIAR LA CONTRASEÑA DESDE DENTRO DE LA APP ---
+  Future<void> _mostrarDialogoCambioContrasena(BuildContext context) async {
+    final TextEditingController _passController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Cambiar mi contraseña', style: TextStyle(color: Color(0xFF004D40), fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Escribe una nueva contraseña que solo tú conozcas (mínimo 6 caracteres).'),
+              const SizedBox(height: 15),
+              TextField(
+                controller: _passController,
+                obscureText: true, // Oculta lo que escriben con puntitos
+                decoration: const InputDecoration(
+                  labelText: 'Nueva contraseña',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCELAR', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.white),
+              onPressed: () async {
+                if (_passController.text.length < 6) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('La contraseña debe tener al menos 6 letras o números.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+                try {
+                  // Le decimos a Firebase que actualice la contraseña
+                  await FirebaseAuth.instance.currentUser?.updatePassword(_passController.text.trim());
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('¡Contraseña actualizada con éxito!', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error al cambiar la contraseña. Intenta cerrar sesión y volver a entrar.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: const Text('GUARDAR', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
   
   // ¡Añadidas las 15h aquí!
   final List<String> horasManana = ['09h', '10h', '11h', '12h', '14h', '15h', '16h'];
@@ -149,7 +214,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
     return resumen.join('   |   '); // Un separador elegante
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
 
     // --- LÓGICA DE HORAS MOSTRADAS ACTUALIZADA ---
@@ -185,191 +250,239 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
       appBar: AppBar(
         title: Row(
           children: [
-            // Image.asset('assets/logo.png', height: 30), 
-            // const SizedBox(width: 10),
-            Text('Hammam ${nombreEquipo.toUpperCase()}', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(nombreEquipo == 'admin' ? 'Panel de Dirección' : 'Hammam ${nombreEquipo.toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ), 
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.schedule, color: Colors.white), 
-            tooltip: 'Bolsa de Horas',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PantallaBolsaHoras())),
+            icon: const Icon(Icons.key, color: Colors.white), 
+            tooltip: 'Cambiar contraseña',
+            onPressed: () => _mostrarDialogoCambioContrasena(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.bar_chart, color: Colors.white), 
-            tooltip: 'Estadísticas',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PantallaEstadisticas())),
-          ),
-          IconButton(
-            icon: const Icon(Icons.people, color: Colors.white), 
-            tooltip: 'Gestionar Equipo',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => PantallaEquipo())),
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          Container(
-            color: const Color(0xFFE0F2F1), 
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.calendar_month, color: Color(0xFF004D40)),
-                const SizedBox(width: 10),
-                Text("Fecha: $fechaTexto", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
-                TextButton(
-                  onPressed: () => _seleccionarFecha(context),
-                  child: const Text('CAMBIAR', style: TextStyle(color: Color(0xFF004D40))),
-                )
-              ],
+          // Ocultamos los iconos pequeños si es administrador
+          if (nombreEquipo != 'admin') ...[
+            IconButton(
+              icon: const Icon(Icons.schedule, color: Colors.white), 
+              tooltip: 'Bolsa de Horas',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PantallaBolsaHoras())),
             ),
-          ),
-          Row(children: [
-            _botonTurno('Mañana', '🌞'), 
-            _botonTurno('Tarde', '🌙'), 
-          ]),
-        
-        // --- PANEL DE INTERRUPTORES ---
-          Container(
-            color: Colors.white,
-            child: Column(
-              children: [
-                SwitchListTile(
-                  title: const Text('Mostrar horas impares', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
-                  value: mostrarHorasImpares,
-                  activeColor: const Color(0xFFD4AF37), 
-                  onChanged: (bool valor) {
-                    setState(() => mostrarHorasImpares = valor);
-                  },
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16), // Rayita separadora
-                SwitchListTile(
-                  title: const Text('Mostrar Comida/Descanso', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
-                  value: mostrarComidas,
-                  activeColor: const Color(0xFFD4AF37), // Dorado también
-                  onChanged: (bool valor) {
-                    setState(() => mostrarComidas = valor);
-                  },
-                ),
-              ],
+            IconButton(
+              icon: const Icon(Icons.bar_chart, color: Colors.white), 
+              tooltip: 'Estadísticas',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PantallaEstadisticas())),
             ),
-          ),
-          const Divider(height: 1),
-          // ------------------------------------------
-          Expanded(
-            // --- ¡AQUÍ ESTÁ EL NUEVO STREAMBUILDER! ---
-            // Se conecta a Firebase para escuchar los cambios de este día exacto
-            child: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection(coleccionTurnos) // Usamos la colección específica
-                  .doc(fechaTexto.replaceAll('/', '-'))
-                  .snapshots(),
-              builder: (context, snapshot) {
-                
-                // Mientras carga, mostramos el circulito
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: Color(0xFF004D40)));
-                }
-
-                // ¡AQUÍ CREAMOS LA VARIABLE diaData PARA QUE LA LEA EL RECUADRO GRIS!
-                Map<String, dynamic> diaData = (snapshot.data?.data() as Map<String, dynamic>?) ?? {};
-
-                String docId = fechaTexto.replaceAll('/', '-');
-
-                // Cambiamos a un ListView normal para meter cosas antes y después
-                return ListView(
-                  children: [
-                    // --- 1. COMENTARIO SUPERIOR ---
-                    CajaComentario(
-                      coleccion: coleccionTurnos, // ¡NUEVO!
-                      docId: docId, 
-                      campo: 'comentarioSuperior', 
-                      textoInicial: diaData['comentarioSuperior'] ?? ''
-                    ),
-
-                    // --- 2. LISTA DE HORAS ---
-                    ...horasMostrar.map((hora) {
-                      String subtitulo = 'Roles y Masajes';
-
-                      if (hora == '09h') {
-                        subtitulo = 'Montaje';
-                      } else if (['11h', '13h', '15h', '17h', '19h', '21h', '23h'].contains(hora)) {
-                        subtitulo = 'Apoyo';
-                      } else if (hora.contains(':30')) {
-                        subtitulo = 'Comida/Descanso';
-                      }
-
-                      String resumen = _generarResumenHora(diaData, hora);
-
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        elevation: 2,
-                        clipBehavior: Clip.antiAlias, 
-                        child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => PantallaAsignacion(hora: hora, fecha: fechaTexto)), 
-                            );
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ListTile(
-                                title: Text(hora, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
-                                subtitle: Text(subtitulo, style: const TextStyle(fontWeight: FontWeight.w500)),
-                                trailing: const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
-                              ),
-                              if (resumen.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[100],
-                                    border: const Border(top: BorderSide(color: Colors.black12, width: 1)),
-                                  ),
-                                  child: Text(
-                                    resumen,
-                                    style: const TextStyle(color: Colors.black54, fontSize: 14, fontStyle: FontStyle.italic, height: 1.4),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-
-                    // --- 3. COMENTARIO INFERIOR ---
-                    CajaComentario(
-                      coleccion: coleccionTurnos, // ¡NUEVO!
-                      docId: docId, 
-                      campo: 'comentarioSuperior', 
-                      textoInicial: diaData['comentarioSuperior'] ?? ''
-                    ),
-                  ],
+            IconButton(
+              icon: const Icon(Icons.people, color: Colors.white), 
+              tooltip: 'Gestionar Equipo',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => PantallaEquipo())),
+            )
+          ],
+          // --- NUEVO BOTÓN DE SALIR (DERECHA DEL TODO) ---
+          IconButton(
+            icon: const Icon(Icons.exit_to_app, color: Colors.white), 
+            tooltip: 'Cerrar sesión',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut(); // Le dice a Firebase que cierre la puerta
+              if (context.mounted) {
+                // Vuelve a la pantalla de selección de equipos y destruye el historial de navegación
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TeamSelectionScreen()),
+                  (route) => false,
                 );
               }
-            ),
-          ),
-          // --- BOTÓN DE COMPARTIR CORREGIDO CON SAFEAREA Y NUEVO TEXTO ---
-          SafeArea( 
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton.icon( 
-                icon: const Icon(Icons.share),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF004D40), 
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50)
-                ),
-                onPressed: () => _compartirDiaCompleto(fechaTexto),
-                label: const Text('COMPARTIR DÍA', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
+            },
           ),
         ],
+      ),
+      // --- MAGIA DE RESTRICCIÓN ---
+      // Si es administrador, cargamos el panel capado. Si es equipo, cargamos la pantalla normal.
+      body: nombreEquipo == 'admin'
+          ? _construirPanelAdmin(context)
+          : Column(
+              children: [
+                Container(
+                  color: const Color(0xFFE0F2F1), 
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.calendar_month, color: Color(0xFF004D40)),
+                      const SizedBox(width: 10),
+                      Text("Fecha: $fechaTexto", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                      TextButton(
+                        onPressed: () => _seleccionarFecha(context),
+                        child: const Text('CAMBIAR', style: TextStyle(color: Color(0xFF004D40))),
+                      )
+                    ],
+                  ),
+                ),
+                Row(children: [
+                  _botonTurno('Mañana', '🌞'), 
+                  _botonTurno('Tarde', '🌙'), 
+                ]),
+              
+              // --- PANEL DE INTERRUPTORES ---
+                Container(
+                  color: Colors.white,
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        title: const Text('Mostrar horas impares', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                        value: mostrarHorasImpares,
+                        activeColor: const Color(0xFFD4AF37), 
+                        onChanged: (bool valor) {
+                          setState(() => mostrarHorasImpares = valor);
+                        },
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      SwitchListTile(
+                        title: const Text('Mostrar Comida/Descanso', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                        value: mostrarComidas,
+                        activeColor: const Color(0xFFD4AF37),
+                        onChanged: (bool valor) {
+                          setState(() => mostrarComidas = valor);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // ------------------------------------------
+                Expanded(
+                  child: StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection(coleccionTurnos)
+                        .doc(fechaTexto.replaceAll('/', '-'))
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(color: Color(0xFF004D40)));
+                      }
+
+                      Map<String, dynamic> diaData = (snapshot.data?.data() as Map<String, dynamic>?) ?? {};
+                      String docId = fechaTexto.replaceAll('/', '-');
+
+                      return ListView(
+                        children: [
+                          CajaComentario(
+                            coleccion: coleccionTurnos,
+                            docId: docId, 
+                            campo: 'comentarioSuperior', 
+                            textoInicial: diaData['comentarioSuperior'] ?? ''
+                          ),
+
+                          ...horasMostrar.map((hora) {
+                            String subtitulo = 'Roles y Masajes';
+
+                            if (hora == '09h') {
+                              subtitulo = 'Montaje';
+                            } else if (['11h', '13h', '15h', '17h', '19h', '21h', '23h'].contains(hora)) {
+                              subtitulo = 'Apoyo';
+                            } else if (hora.contains(':30')) {
+                              subtitulo = 'Comida/Descanso';
+                            }
+
+                            String resumen = _generarResumenHora(diaData, hora);
+
+                            return Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              elevation: 2,
+                              clipBehavior: Clip.antiAlias, 
+                              child: InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => PantallaAsignacion(hora: hora, fecha: fechaTexto)), 
+                                  );
+                                },
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    ListTile(
+                                      title: Text(hora, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                                      subtitle: Text(subtitulo, style: const TextStyle(fontWeight: FontWeight.w500)),
+                                      trailing: const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
+                                    ),
+                                    if (resumen.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[100],
+                                          border: const Border(top: BorderSide(color: Colors.black12, width: 1)),
+                                        ),
+                                        child: Text(
+                                          resumen,
+                                          style: const TextStyle(color: Colors.black54, fontSize: 14, fontStyle: FontStyle.italic, height: 1.4),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+
+                          CajaComentario(
+                            coleccion: coleccionTurnos,
+                            docId: docId, 
+                            campo: 'comentarioInferior', 
+                            textoInicial: diaData['comentarioInferior'] ?? ''
+                          ),
+                        ],
+                      );
+                    }
+                  ),
+                ),
+                SafeArea( 
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ElevatedButton.icon( 
+                      icon: const Icon(Icons.share),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF004D40), 
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50)
+                      ),
+                      onPressed: () => _compartirDiaCompleto(fechaTexto),
+                      label: const Text('COMPARTIR DÍA', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  // --- PANEL EXCLUSIVO PARA ADMINISTRADORES ---
+ // --- PANEL EXCLUSIVO PARA ADMINISTRADORES ---
+  Widget _construirPanelAdmin(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.admin_panel_settings, size: 100, color: Color(0xFF004D40)),
+            const SizedBox(height: 20),
+            const Text('Panel de Análisis', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+            const SizedBox(height: 15),
+            const Text('Acceso exclusivo de lectura a las estadísticas de los diferentes equipos.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.black54)),
+            const SizedBox(height: 50),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.bar_chart),
+              label: const Text('VER ESTADÍSTICAS GLOBALES', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF004D40),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 60),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PantallaEstadisticas())),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,30 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <-- Importamos Auth
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 // --- MAGIA: IDENTIFICADOR AUTOMÁTICO DE EQUIPO ---
-// --- MAGIA: IDENTIFICADOR AUTOMÁTICO DE EQUIPO ---
-  String get nombreEquipo {
-    final email = FirebaseAuth.instance.currentUser?.email ?? '';
-    final user = email.split('@')[0]; 
-    
-    // Agrupamos a los usuarios bajo su carpeta de equipo correspondiente
-    if (user == 'triana' || user == 'carmen') return 'triana';
-    if (user == 'ruben' || user == 'monica') return 'ruben';
-    if (user == 'rocio' || user == 'santi') return 'rocio';
-    
-    return 'general';
-  }
+String get nombreEquipo {
+  final email = FirebaseAuth.instance.currentUser?.email ?? '';
+  final user = email.split('@')[0]; 
+  
+  if (user == 'triana' || user == 'triana2') return 'triana';
+  if (user == 'ruben' || user == 'ruben2') return 'ruben';
+  if (user == 'rocio' || user == 'rocio2') return 'rocio';
+  if (user == 'admin' || user == 'admin2') return 'admin';
+  
+  return 'general';
+}
 
-// Variable dinámica para saber de dónde leer los turnos
-String get coleccionTurnos => (nombreEquipo == 'triana' || nombreEquipo == 'admin') ? 'turnos' : 'turnos_$nombreEquipo';
-
-
-// --- PANTALLA DE ESTADÍSTICAS AVANZADA (Con Filtros) ---
 class PantallaEstadisticas extends StatefulWidget {
   const PantallaEstadisticas({super.key});
   @override
@@ -33,9 +27,10 @@ class PantallaEstadisticas extends StatefulWidget {
 
 class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
   DateTime mesVisualizado = DateTime.now();
-  
-  // --- NUEVA VARIABLE: MEMORIA DEL FILTRO ---
   String filtroActual = 'Roles'; 
+  
+  // --- NUEVO: MEMORIA DEL FILTRO DE ADMIN ---
+  String equipoAdminFiltro = 'triana'; // Por defecto ven a Triana
 
   void _cambiarMes(int mesesSuma) {
     setState(() {
@@ -43,15 +38,12 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
     });
   }
 
-  // --- LÓGICA DEL FILTRO ACTUALIZADA ---
   bool _cumpleFiltro(String rol) {
     if (filtroActual == 'Montaje') {
       return rol == 'Montaje';
     } else if (filtroActual == 'Roles') {
-      // Ahora incluye A, AZ, AE y ASE
       return ['A', 'AZ', 'AE', 'ASE'].contains(rol); 
     } else if (filtroActual == 'AA/Despedida') {
-      // Nueva pestaña para AA y Despedida
       return ['AA', 'Despedida'].contains(rol);
     } else if (filtroActual == 'Servicios Especiales') {
       return ['ZAH', 'BAY 30', 'BAY 45', 'JZ', 'NAF'].contains(rol);
@@ -59,21 +51,32 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
     return false;
   }
 
-  // --- DISEÑO DE LOS BOTONES DE FILTRO ---
+  // --- BOTONES PARA EL FILTRO DE ROLES ---
   Widget _chipFiltro(String titulo) {
     bool activo = filtroActual == titulo;
     return ChoiceChip(
       label: Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, color: activo ? Colors.white : Colors.black87)),
       selected: activo,
-      selectedColor: const Color(0xFF004D40), // Verde oscuro si está activo
-      backgroundColor: Colors.grey[200], // Gris claro si está inactivo
-      showCheckmark: false, // Quitamos el 'tic' para que parezca un botón normal
+      selectedColor: const Color(0xFF004D40), 
+      backgroundColor: Colors.grey[200], 
+      showCheckmark: false,
       onSelected: (bool seleccionado) {
-        if (seleccionado) {
-          setState(() {
-            filtroActual = titulo;
-          });
-        }
+        if (seleccionado) setState(() => filtroActual = titulo);
+      },
+    );
+  }
+
+  // --- NUEVOS BOTONES PARA EL FILTRO DE EQUIPO (SOLO ADMIN) ---
+  Widget _chipEquipoAdmin(String id, String titulo) {
+    bool activo = equipoAdminFiltro == id;
+    return ChoiceChip(
+      label: Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, color: activo ? Colors.white : Colors.black87)),
+      selected: activo,
+      selectedColor: const Color(0xFFD4AF37), // Dorado para diferenciarlo
+      backgroundColor: Colors.white,
+      showCheckmark: false,
+      onSelected: (bool seleccionado) {
+        if (seleccionado) setState(() => equipoAdminFiltro = id);
       },
     );
   }
@@ -103,7 +106,6 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  // Añadimos el nombre del filtro al PDF
                   pw.Text("RESUMEN: ${filtroActual.toUpperCase()}", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800)),
                   pw.Text(mesTxt, style: pw.TextStyle(fontSize: 16, color: PdfColors.grey700)),
                 ]
@@ -155,8 +157,16 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
     List<String> nombresMeses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     String textoMes = "${nombresMeses[mesVisualizado.month]} ${mesVisualizado.year}";
 
+    // --- DECIDIMOS QUÉ BASE DE DATOS LEER SEGÚN QUIÉN ESTÉ CONECTADO ---
+    String coleccionAUsar;
+    if (nombreEquipo == 'admin') {
+      coleccionAUsar = equipoAdminFiltro == 'triana' ? 'turnos' : 'turnos_$equipoAdminFiltro';
+    } else {
+      coleccionAUsar = (nombreEquipo == 'triana') ? 'turnos' : 'turnos_$nombreEquipo';
+    }
+
     return FutureBuilder<QuerySnapshot>(
-      future: FirebaseFirestore.instance.collection(coleccionTurnos).get(), // <-- Usamos la colección dinámica
+      future: FirebaseFirestore.instance.collection(coleccionAUsar).get(), // Leemos de la colección correcta
       builder: (context, snapshot) {
         
         Map<String, Map<String, int>> statsPorPersona = {};
@@ -169,11 +179,8 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
               Map<String, dynamic> horas = doc.data() as Map<String, dynamic>;
               
               horas.forEach((hora, roles) {
-                // --- EL PARACAÍDAS: Solo procesa si 'roles' es una lista de turnos (ignorando los comentarios de texto) ---
                 if (roles is Map<String, dynamic>) {
                   roles.forEach((rol, asignado) {
-                    
-                    // --- AQUÍ APLICAMOS EL FILTRO DINÁMICO ---
                     if (_cumpleFiltro(rol)) {
                       void sumarRol(String persona) {
                         if (!statsPorPersona.containsKey(persona)) statsPorPersona[persona] = {};
@@ -182,14 +189,12 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
                           maximosTurnosDeUnaPersona = statsPorPersona[persona]![rol]!;
                         }
                       }
-
                       if (asignado is List) {
                         for (var p in asignado) sumarRol(p.toString());
                       } else if (asignado is String && asignado.isNotEmpty) {
                         sumarRol(asignado);
                       }
                     }
-                    
                   });
                 }
               });
@@ -206,7 +211,7 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Gráficas de Equipo', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(nombreEquipo == 'admin' ? 'Estadísticas Globales' : 'Gráficas de Equipo', style: const TextStyle(fontWeight: FontWeight.bold)),
             actions: [
               IconButton(
                 icon: const Icon(Icons.picture_as_pdf),
@@ -218,20 +223,40 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
           backgroundColor: Colors.grey[100], 
           body: Column(
             children: [
+              // --- SECCIÓN NUEVA: BARRA DE EQUIPOS (SOLO PARA ADMINS) ---
+              if (nombreEquipo == 'admin')
+                Container(
+                  color: Colors.grey[300],
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.admin_panel_settings, color: Color(0xFF004D40)),
+                      const SizedBox(width: 10),
+                      _chipEquipoAdmin('triana', 'Triana'),
+                      const SizedBox(width: 8),
+                      _chipEquipoAdmin('ruben', 'Rubén'),
+                      const SizedBox(width: 8),
+                      _chipEquipoAdmin('rocio', 'Rocío'),
+                    ],
+                  ),
+                ),
+
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.only(top: 10, left: 20, right: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    IconButton(icon: const Icon(Icons.arrow_back_ios, color: const Color(0xFF004D40)), onPressed: () => _cambiarMes(-1)),
+                    IconButton(icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF004D40)), onPressed: () => _cambiarMes(-1)),
                     Text(textoMes.toUpperCase(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
-                    IconButton(icon: const Icon(Icons.arrow_forward_ios, color: const Color(0xFF004D40)), onPressed: () => _cambiarMes(1)),
+                    IconButton(icon: const Icon(Icons.arrow_forward_ios, color: Color(0xFF004D40)), onPressed: () => _cambiarMes(1)),
                   ],
                 ),
               ),
               
-              // --- NUEVA BARRA DE BOTONES DESLIZABLE ---
+              // --- BARRA DE BOTONES DE ROLES DESLIZABLE ---
               Container(
                 color: Colors.white,
                 width: double.infinity,
@@ -241,9 +266,9 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      _chipFiltro('Roles'), // Predeterminado
+                      _chipFiltro('Roles'),
                       const SizedBox(width: 8),
-                      _chipFiltro('AA/Despedida'), // <-- NUEVO BOTÓN AQUÍ
+                      _chipFiltro('AA/Despedida'), 
                       const SizedBox(width: 8),
                       _chipFiltro('Montaje'),
                       const SizedBox(width: 8),
@@ -260,7 +285,7 @@ class _PantallaEstadisticasState extends State<PantallaEstadisticas> {
                   : listaOrdenada.isEmpty
                     ? Center(child: Text("No hay datos de $filtroActual en este mes.", style: const TextStyle(fontSize: 16, color: Colors.grey)))
                     : ListView(
-                        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80), // Mantenemos el aire por abajo
+                        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
                         children: listaOrdenada.map((entradaPersona) {
                           String nombre = entradaPersona.key;
                           Map<String, int> rolesDeEstaPersona = entradaPersona.value;
