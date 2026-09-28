@@ -56,7 +56,6 @@ class DefaultFirebaseOptions {
     projectId: 'hammam-equipo-triana',
     storageBucket: 'hammam-equipo-triana.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBKr6opG3R0s_ScCeqLTdW350DTxJqqLIU',
     appId: '1:720084868040:ios:0a42d54ae1c4bebf82befd',
@@ -65,7 +64,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'hammam-equipo-triana.firebasestorage.app',
     iosBundleId: 'com.example.hammamManager',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyBKr6opG3R0s_ScCeqLTdW350DTxJqqLIU',
     appId: '1:720084868040:ios:0a42d54ae1c4bebf82befd',

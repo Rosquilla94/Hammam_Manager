@@ -103,6 +103,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
   // --- FUNCIÓN PARA CAMBIAR LA CONTRASEÑA DESDE DENTRO DE LA APP ---
   Future<void> _mostrarDialogoCambioContrasena(BuildContext context) async {
     final TextEditingController _passController = TextEditingController();
+    final TextEditingController _confirmPassController = TextEditingController(); // <-- NUEVO CONTROLADOR
 
     showDialog(
       context: context,
@@ -116,11 +117,22 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
               const SizedBox(height: 15),
               TextField(
                 controller: _passController,
-                obscureText: true, // Oculta lo que escriben con puntitos
+                obscureText: true, 
                 decoration: const InputDecoration(
                   labelText: 'Nueva contraseña',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.lock),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // --- NUEVO CAMPO DE CONFIRMACIÓN ---
+              TextField(
+                controller: _confirmPassController,
+                obscureText: true, 
+                decoration: const InputDecoration(
+                  labelText: 'Repite la contraseña',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock_outline),
                 ),
               ),
             ],
@@ -139,8 +151,15 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
                   );
                   return;
                 }
+                // --- NUEVA VALIDACIÓN: DOBLE CHECK ---
+                if (_passController.text != _confirmPassController.text) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Las contraseñas no coinciden. Revísalas.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+                
                 try {
-                  // Le decimos a Firebase que actualice la contraseña
                   await FirebaseAuth.instance.currentUser?.updatePassword(_passController.text.trim());
                   if (context.mounted) {
                     Navigator.pop(context);
@@ -248,10 +267,13 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Text(nombreEquipo == 'admin' ? 'Panel de Dirección' : 'Hammam ${nombreEquipo.toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            nombreEquipo == 'admin' ? 'Panel de Dirección' : 'Hammam ${nombreEquipo.toUpperCase()}', 
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ), 
         centerTitle: false,
         actions: [

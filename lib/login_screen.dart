@@ -106,6 +106,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   }
                 } on FirebaseAuthException catch (e) {
+                  // --- ¡NUEVO CHIVATO! ---
+                  print("🔥 ERROR DE FIREBASE: ${e.code} - ${e.message}"); 
+                  
                   String errorMsg = 'Error al iniciar sesión';
                   if (e.code == 'user-not-found' || e.code == 'invalid-email' || e.code == 'invalid-credential') {
                     errorMsg = 'Usuario o contraseña incorrectos';
@@ -115,6 +118,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(errorMsg, style: const TextStyle(color: Colors.white)),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  // --- ¡NUEVO CHIVATO! ---
+                  print("🔥 ERROR DESCONOCIDO: $e"); 
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Error interno al iniciar sesión', style: TextStyle(color: Colors.white)),
                         backgroundColor: Colors.red,
                       ),
                     );
