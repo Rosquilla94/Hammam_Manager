@@ -5,7 +5,30 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class PantallaAsignacion extends StatelessWidget {
   final String hora;
   final String fecha; 
-  const PantallaAsignacion({super.key, required this.hora, required this.fecha});
+  final String nombreEquipo;
+  const PantallaAsignacion({
+    Key? key,
+    required this.fecha,
+    required this.hora,
+    required this.nombreEquipo, // <-- NUEVO: Le exigimos que se lo pasen al abrir la pantalla
+  }) : super(key: key);
+
+// --- 1. REGLAS A PRUEBA DE MAYÚSCULAS ---
+  String get coleccionTurnos {
+    String equipoLimpio = nombreEquipo.toLowerCase().trim(); // Lo pasa a minúsculas y quita espacios
+    if (equipoLimpio == 'triana' || equipoLimpio == 'admin') {
+      return 'turnos';
+    }
+    return 'turnos_$equipoLimpio';
+  }
+  
+  String get documentoEquipo {
+    String equipoLimpio = nombreEquipo.toLowerCase().trim();
+    if (equipoLimpio == 'triana' || equipoLimpio == 'admin') {
+      return 'equipo'; 
+    }
+    return 'equipo_$equipoLimpio'; 
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,12 +37,18 @@ class PantallaAsignacion extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text('Reparto $hora', style: const TextStyle(fontWeight: FontWeight.bold))),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('config').doc('equipo').snapshots(),
+        stream: FirebaseFirestore.instance.collection('config').doc(documentoEquipo).snapshots(),
         builder: (context, snapshotEquipo) {
+          
+          // --- 2. CÍRCULO DE CARGA PARA LOS TRABAJADORES ---
+          if (snapshotEquipo.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF004D40)));
+          }
+
           List<String> equipoGlobal = List<String>.from((snapshotEquipo.data?.data() as Map<String, dynamic>?)?['lista'] ?? []);
 
           return StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance.collection('turnos').doc(docId).snapshots(),
+            stream: FirebaseFirestore.instance.collection(coleccionTurnos).doc(docId).snapshots(),
             builder: (context, snapshotTurnos) {
               if (snapshotTurnos.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator(color: Color(0xFF004D40)));
@@ -99,7 +128,7 @@ class PantallaAsignacion extends StatelessWidget {
           ...disponibles.map((n) => DropdownMenuItem(value: n, child: Text(n)))
         ],
         onChanged: (val) {
-          FirebaseFirestore.instance.collection('turnos').doc(docId).set({
+          FirebaseFirestore.instance.collection(coleccionTurnos).doc(docId).set({
             hora: { clave: val }
           }, SetOptions(merge: true)); 
         },
@@ -170,7 +199,7 @@ class PantallaAsignacion extends StatelessWidget {
             }
           );
           
-          FirebaseFirestore.instance.collection('turnos').doc(docId).set({
+          FirebaseFirestore.instance.collection(coleccionTurnos).doc(docId).set({
             hora: { clave: seleccionTemporal }
           }, SetOptions(merge: true));
         },

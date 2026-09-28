@@ -417,7 +417,7 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (context) => PantallaAsignacion(hora: hora, fecha: fechaTexto)), 
+                                    MaterialPageRoute(builder: (context) => PantallaAsignacion(hora: hora, fecha: fechaTexto, nombreEquipo: nombreEquipo,)), 
                                   );
                                 },
                                 child: Column(
@@ -477,7 +477,6 @@ class _PantallaTurnosState extends State<PantallaTurnos> {
     );
   }
 
-  // --- PANEL EXCLUSIVO PARA ADMINISTRADORES ---
  // --- PANEL EXCLUSIVO PARA ADMINISTRADORES ---
   Widget _construirPanelAdmin(BuildContext context) {
     return Center(
